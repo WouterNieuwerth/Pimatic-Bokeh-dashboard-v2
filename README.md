@@ -1,1 +1,1 @@
-# Pimatic Bokeh dashboard v2
+# Pimatic Bokeh dashboard
