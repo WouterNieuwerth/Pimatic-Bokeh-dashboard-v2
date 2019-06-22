@@ -11,10 +11,13 @@ import pandas as pd
 from math import pi
 
 from bokeh.models import ColumnDataSource, LinearColorMapper, ColorBar, BasicTicker, PrintfTickFormatter, RadioButtonGroup, Panel
+from bokeh.models.widgets import Button
 from bokeh.models.tickers import FixedTicker
 from bokeh.plotting import figure
 from bokeh.palettes import inferno
 from bokeh.layouts import gridplot
+
+from scripts.datahandler import getData
 
 colors = inferno(25)
 TOOLS = "hover,save,pan,box_zoom,reset,wheel_zoom"
@@ -23,17 +26,40 @@ def heatmap2(df):
     
     def make_dataset(df, usageType):
         """
-        usageType:'gastotalusage, tariff1totalusage of tariff2totalusage
+        usageType:'gastotalusage, tariff1totalusage, tariff2totalusage of powertotalusage
         """
         
-        df_verwerkt = df[df['attributeName'] == usageType]
-        df_verwerkt = df_verwerkt.sort_values('time')
-        df_verwerkt = df_verwerkt.replace(0,np.NaN)
-        df_verwerkt = df_verwerkt.fillna(method='ffill')
-        df_verwerkt['time'] = pd.to_datetime(df_verwerkt['time'], unit='ms')
-        df_verwerkt['hour'] = df_verwerkt['time'].dt.hour
-        df_verwerkt['dayofweek'] = df_verwerkt['time'].dt.dayofweek
-        df_verwerkt['difference'] = df_verwerkt['value'].diff()
+        if usageType == 'powertotalusage': # select both tariff1totalusage and tariff2totalusage
+            
+            df_verwerkt1 = df[df['attributeName'] == 'tariff1totalusage']
+            df_verwerkt1 = df_verwerkt1.sort_values('time')
+            df_verwerkt1 = df_verwerkt1.replace(0,np.NaN)
+            df_verwerkt1 = df_verwerkt1.fillna(method='ffill')
+            df_verwerkt1['time'] = pd.to_datetime(df_verwerkt1['time'], unit='ms')
+            df_verwerkt1['hour'] = df_verwerkt1['time'].dt.hour
+            df_verwerkt1['dayofweek'] = df_verwerkt1['time'].dt.dayofweek
+            df_verwerkt1['difference'] = df_verwerkt1['value'].diff()
+            
+            df_verwerkt2 = df[df['attributeName'] == 'tariff2totalusage']
+            df_verwerkt2 = df_verwerkt2.sort_values('time')
+            df_verwerkt2 = df_verwerkt2.replace(0,np.NaN)
+            df_verwerkt2 = df_verwerkt2.fillna(method='ffill')
+            df_verwerkt2['time'] = pd.to_datetime(df_verwerkt2['time'], unit='ms')
+            df_verwerkt2['hour'] = df_verwerkt2['time'].dt.hour
+            df_verwerkt2['dayofweek'] = df_verwerkt2['time'].dt.dayofweek
+            df_verwerkt2['difference'] = df_verwerkt2['value'].diff()
+            
+            df_verwerkt = pd.concat([df_verwerkt1, df_verwerkt2], ignore_index=True)
+            
+        else: # business as usual, select a single usageType
+            df_verwerkt = df[df['attributeName'] == usageType]
+            df_verwerkt = df_verwerkt.sort_values('time')
+            df_verwerkt = df_verwerkt.replace(0,np.NaN)
+            df_verwerkt = df_verwerkt.fillna(method='ffill')
+            df_verwerkt['time'] = pd.to_datetime(df_verwerkt['time'], unit='ms')
+            df_verwerkt['hour'] = df_verwerkt['time'].dt.hour
+            df_verwerkt['dayofweek'] = df_verwerkt['time'].dt.dayofweek
+            df_verwerkt['difference'] = df_verwerkt['value'].diff()
         
         pivot = pd.pivot_table(df_verwerkt, index='dayofweek', columns='hour', values='difference', aggfunc=sum)
         pivot = pivot.fillna(0)
@@ -94,6 +120,51 @@ def heatmap2(df):
         elif selected == 2:
             usageType = 'tariff2totalusage'
             p1.title.text = 'Stroomtarief 2 verbruik'
+        elif selected == 3:
+            usageType = 'powertotalusage'
+            p1.title.text = 'Stroomverbruik per uur'
+        
+        print('Update usageType: ' + str(usageType))
+       
+        # update data
+        new_src = make_dataset(df, usageType)
+        new_srch = make_dataset_horizontaal(df, usageType)
+        new_srcv = make_dataset_verticaal(df, usageType)
+        
+        src.data.update(new_src.data)
+        srch.data.update(new_srch.data)
+        srcv.data.update(new_srcv.data)
+        
+        # update color bar
+        new_df = src.to_df()
+        mapper1.low = new_df.aantal.min()
+        mapper1.high = new_df.aantal.max()
+        
+        print('------------------------')
+        
+    def update_data():
+        
+        df = getData()
+        
+        # Get the selected items for the graph
+        # ...
+        selected = radio_button_group.active
+        
+        usageType = 'gastotalusage' # standaardwaarde
+        
+        # Koppel de selectie aan de juiste gegevens uit het DataFrame
+        if selected == 0:
+            usageType = 'gastotalusage'
+            p1.title.text = 'Gasverbruik per uur'
+        elif selected == 1:
+            usageType = 'tariff1totalusage'
+            p1.title.text = 'Stroomtarief 1 verbruik'
+        elif selected == 2:
+            usageType = 'tariff2totalusage'
+            p1.title.text = 'Stroomtarief 2 verbruik'
+        elif selected == 3:
+            usageType = 'powertotalusage'
+            p1.title.text = 'Stroomverbruik per uur'
         
         print('Update usageType: ' + str(usageType))
        
@@ -115,17 +186,47 @@ def heatmap2(df):
         
     def make_dataset_horizontaal(df, usageType):
         
-        df_verwerkt = df[df['attributeName'] == usageType]
-        df_verwerkt = df_verwerkt.sort_values('time')
-        df_verwerkt = df_verwerkt.replace(0,np.NaN)
-        df_verwerkt = df_verwerkt.fillna(method='ffill')
-        df_verwerkt = df_verwerkt.fillna(method='bfill') # nodig om eerste rij te fixen.
-        df_verwerkt['time'] = pd.to_datetime(df_verwerkt['time'], unit='ms')
-        df_verwerkt['hour'] = df_verwerkt['time'].dt.hour
-        df_verwerkt['minutes'] = (df_verwerkt['time'].dt.hour * 60) + df_verwerkt['time'].dt.minute
-        df_verwerkt['dayofweek'] = df_verwerkt['time'].dt.dayofweek
-        df_verwerkt['difference'] = df_verwerkt['value'].diff()
-        df_verwerkt['difference'] = df_verwerkt['difference'].fillna(0)
+        if usageType == 'powertotalusage': # select both tariff1totalusage and tariff2totalusage
+            
+            df_verwerkt1 = df[df['attributeName'] == 'tariff1totalusage']
+            df_verwerkt1 = df_verwerkt1.sort_values('time')
+            df_verwerkt1 = df_verwerkt1.replace(0,np.NaN)
+            df_verwerkt1 = df_verwerkt1.fillna(method='ffill')
+            df_verwerkt1 = df_verwerkt1.fillna(method='bfill') # nodig om eerste rij te fixen.
+            df_verwerkt1['time'] = pd.to_datetime(df_verwerkt1['time'], unit='ms')
+            df_verwerkt1['hour'] = df_verwerkt1['time'].dt.hour
+            df_verwerkt1['minutes'] = (df_verwerkt1['time'].dt.hour * 60) + df_verwerkt1['time'].dt.minute
+            df_verwerkt1['dayofweek'] = df_verwerkt1['time'].dt.dayofweek
+            df_verwerkt1['difference'] = df_verwerkt1['value'].diff()
+            df_verwerkt1['difference'] = df_verwerkt1['difference'].fillna(0)
+            
+            df_verwerkt2 = df[df['attributeName'] == 'tariff2totalusage']
+            df_verwerkt2 = df_verwerkt2.sort_values('time')
+            df_verwerkt2 = df_verwerkt2.replace(0,np.NaN)
+            df_verwerkt2 = df_verwerkt2.fillna(method='ffill')
+            df_verwerkt2 = df_verwerkt2.fillna(method='bfill') # nodig om eerste rij te fixen.
+            df_verwerkt2['time'] = pd.to_datetime(df_verwerkt2['time'], unit='ms')
+            df_verwerkt2['hour'] = df_verwerkt2['time'].dt.hour
+            df_verwerkt2['minutes'] = (df_verwerkt2['time'].dt.hour * 60) + df_verwerkt2['time'].dt.minute
+            df_verwerkt2['dayofweek'] = df_verwerkt2['time'].dt.dayofweek
+            df_verwerkt2['difference'] = df_verwerkt2['value'].diff()
+            df_verwerkt2['difference'] = df_verwerkt2['difference'].fillna(0)
+            
+            df_verwerkt = pd.concat([df_verwerkt1, df_verwerkt2], ignore_index=True)
+            
+        else: # business as usual, select a single usageType
+            df_verwerkt = df[df['attributeName'] == usageType]
+            df_verwerkt = df_verwerkt.sort_values('time')
+            df_verwerkt = df_verwerkt.replace(0,np.NaN)
+            df_verwerkt = df_verwerkt.fillna(method='ffill')
+            df_verwerkt = df_verwerkt.fillna(method='bfill') # nodig om eerste rij te fixen.
+            df_verwerkt['time'] = pd.to_datetime(df_verwerkt['time'], unit='ms')
+            df_verwerkt['hour'] = df_verwerkt['time'].dt.hour
+            df_verwerkt['minutes'] = (df_verwerkt['time'].dt.hour * 60) + df_verwerkt['time'].dt.minute
+            df_verwerkt['dayofweek'] = df_verwerkt['time'].dt.dayofweek
+            df_verwerkt['difference'] = df_verwerkt['value'].diff()
+            df_verwerkt['difference'] = df_verwerkt['difference'].fillna(0)
+        
         
         groupby = df_verwerkt.groupby('hour').sum()
     
@@ -149,17 +250,47 @@ def heatmap2(df):
     
     def make_dataset_verticaal(df, usageType):
         
-        df_verwerkt = df[df['attributeName'] == usageType]
-        df_verwerkt = df_verwerkt.sort_values('time')
-        df_verwerkt = df_verwerkt.replace(0,np.NaN)
-        df_verwerkt = df_verwerkt.fillna(method='ffill')
-        df_verwerkt = df_verwerkt.fillna(method='bfill') # nodig om eerste rij te fixen.
-        df_verwerkt['time'] = pd.to_datetime(df_verwerkt['time'], unit='ms')
-        df_verwerkt['hour'] = df_verwerkt['time'].dt.hour
-        df_verwerkt['minutes'] = (df_verwerkt['time'].dt.hour * 60) + df_verwerkt['time'].dt.minute
-        df_verwerkt['dayofweek'] = df_verwerkt['time'].dt.dayofweek
-        df_verwerkt['difference'] = df_verwerkt['value'].diff()
-        df_verwerkt['difference'] = df_verwerkt['difference'].fillna(0)
+        if usageType == 'powertotalusage': # select both tariff1totalusage and tariff2totalusage
+            
+            df_verwerkt1 = df[df['attributeName'] == 'tariff1totalusage']
+            df_verwerkt1 = df_verwerkt1.sort_values('time')
+            df_verwerkt1 = df_verwerkt1.replace(0,np.NaN)
+            df_verwerkt1 = df_verwerkt1.fillna(method='ffill')
+            df_verwerkt1 = df_verwerkt1.fillna(method='bfill') # nodig om eerste rij te fixen.
+            df_verwerkt1['time'] = pd.to_datetime(df_verwerkt1['time'], unit='ms')
+            df_verwerkt1['hour'] = df_verwerkt1['time'].dt.hour
+            df_verwerkt1['minutes'] = (df_verwerkt1['time'].dt.hour * 60) + df_verwerkt1['time'].dt.minute
+            df_verwerkt1['dayofweek'] = df_verwerkt1['time'].dt.dayofweek
+            df_verwerkt1['difference'] = df_verwerkt1['value'].diff()
+            df_verwerkt1['difference'] = df_verwerkt1['difference'].fillna(0)
+            
+            df_verwerkt2 = df[df['attributeName'] == 'tariff2totalusage']
+            df_verwerkt2 = df_verwerkt2.sort_values('time')
+            df_verwerkt2 = df_verwerkt2.replace(0,np.NaN)
+            df_verwerkt2 = df_verwerkt2.fillna(method='ffill')
+            df_verwerkt2 = df_verwerkt2.fillna(method='bfill') # nodig om eerste rij te fixen.
+            df_verwerkt2['time'] = pd.to_datetime(df_verwerkt2['time'], unit='ms')
+            df_verwerkt2['hour'] = df_verwerkt2['time'].dt.hour
+            df_verwerkt2['minutes'] = (df_verwerkt2['time'].dt.hour * 60) + df_verwerkt2['time'].dt.minute
+            df_verwerkt2['dayofweek'] = df_verwerkt2['time'].dt.dayofweek
+            df_verwerkt2['difference'] = df_verwerkt2['value'].diff()
+            df_verwerkt2['difference'] = df_verwerkt2['difference'].fillna(0)
+            
+            df_verwerkt = pd.concat([df_verwerkt1, df_verwerkt2], ignore_index=True)
+            
+        else: # business as usual, select a single usageType
+            df_verwerkt = df[df['attributeName'] == usageType]
+            df_verwerkt = df_verwerkt.sort_values('time')
+            df_verwerkt = df_verwerkt.replace(0,np.NaN)
+            df_verwerkt = df_verwerkt.fillna(method='ffill')
+            df_verwerkt = df_verwerkt.fillna(method='bfill') # nodig om eerste rij te fixen.
+            df_verwerkt['time'] = pd.to_datetime(df_verwerkt['time'], unit='ms')
+            df_verwerkt['hour'] = df_verwerkt['time'].dt.hour
+            df_verwerkt['minutes'] = (df_verwerkt['time'].dt.hour * 60) + df_verwerkt['time'].dt.minute
+            df_verwerkt['dayofweek'] = df_verwerkt['time'].dt.dayofweek
+            df_verwerkt['difference'] = df_verwerkt['value'].diff()
+            df_verwerkt['difference'] = df_verwerkt['difference'].fillna(0)
+            
         
         groupbyVertical = df_verwerkt.groupby('dayofweek').sum()
     
@@ -185,9 +316,13 @@ def heatmap2(df):
         return p
 
     radio_button_group = RadioButtonGroup(
-        labels=["Gas", "Tarief 1", "Tarief 2"], active=0)
+        labels=["Gas", "Tarief 1", "Tarief 2", "Stroom totaal"], active=0)
     
     radio_button_group.on_change('active', update)
+    
+    button = Button(label="Update data", button_type="success")
+    
+    button.on_click(update_data)
     
     # initial execution
     src = make_dataset(df, 'gastotalusage')
@@ -202,7 +337,7 @@ def heatmap2(df):
     
     
     # make a grid
-    grid = gridplot([[radio_button_group],[p1, p3],[p2]])
+    grid = gridplot([[radio_button_group, button],[p1, p3],[p2]])
     
     tab = Panel(child = grid, title = 'Heatmap')
     
