@@ -9,6 +9,7 @@ Created on Sat May 11 19:12:11 2019
 import numpy as np
 import pandas as pd
 from math import pi
+from pytz import timezone
 
 from bokeh.models import ColumnDataSource, LinearColorMapper, ColorBar, BasicTicker, PrintfTickFormatter, RadioButtonGroup, Panel
 from bokeh.models.tickers import FixedTicker
@@ -30,10 +31,12 @@ def heatmap(df):
         df_verwerkt = df_verwerkt.sort_values('time')
         df_verwerkt = df_verwerkt.replace(0,np.NaN)
         df_verwerkt = df_verwerkt.fillna(method='ffill')
-        df_verwerkt['time'] = pd.to_datetime(df_verwerkt['time'], unit='ms')
+        df_verwerkt['time'] = pd.to_datetime(df_verwerkt['time'], unit='ms', utc=True)
+        df_verwerkt['time'] = df_verwerkt['time'].apply(lambda x: x.astimezone(timezone('Europe/Amsterdam')))
         df_verwerkt['hour'] = df_verwerkt['time'].dt.hour
         df_verwerkt['dayofweek'] = df_verwerkt['time'].dt.dayofweek
         df_verwerkt['difference'] = df_verwerkt['value'].diff()
+        df_verwerkt[df_verwerkt['difference'] > 1000] = 0 # sprong naar Nederhoven uitfilteren
         
         pivot = pd.pivot_table(df_verwerkt, index='dayofweek', columns='hour', values='difference', aggfunc=sum)
         pivot = pivot.fillna(0)

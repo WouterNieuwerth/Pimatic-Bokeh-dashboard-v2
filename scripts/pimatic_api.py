@@ -9,7 +9,7 @@ Created on Sat Mar 16 19:11:24 2019
 import requests
 import datetime
 import pandas as pd
-from secrets import secrets
+from secretsss import secrets
 
 secrets = secrets()
 
@@ -30,7 +30,7 @@ def smartmeter (start_date=datetime.datetime(2019, 3, 1), end_date=datetime.date
         # https://pimatic.org/api/actions/ --> queryDeviceAttributeEvents
         data = '{"criteria": { "deviceId": "smartmeter2", "after": ' + str(start) + ', "before": ' + str(eind) +'}}'
     
-        response = requests.get('http://192.168.2.13:8080/api/database/device-attributes/', auth=(secrets['username'], secrets['password']), headers=headers, data=data)
+        response = requests.get('http://192.168.2.17:8080/api/database/device-attributes/', auth=(secrets['username'], secrets['password']), headers=headers, data=data)
         jsonresponse = response.json()
     
         for data in jsonresponse['events']:
@@ -46,5 +46,5 @@ def unix_time_millis(dt):
     return int((dt - epoch).total_seconds() * 1000.0)
 
 def daterange(start_date, end_date):
-    for n in range(int ((end_date - start_date).days)):
+    for n in range(int ((end_date - start_date).days)+1):
         yield start_date + datetime.timedelta(n)

@@ -23,7 +23,7 @@ def getData():
     try:
         df = pd.read_csv(join(dirname(__file__), 'data', 'smartmeter_output.csv'), index_col=0)
         latest = max(pd.to_datetime(df['time'], unit='ms'))
-        now = datetime.datetime.today()
+        now = datetime.datetime.now()
         try:
             if (latest < now):
                 df_new = smartmeter(start_date=latest, end_date=now)
