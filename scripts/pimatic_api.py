@@ -30,7 +30,7 @@ def smartmeter (start_date=datetime.datetime(2019, 3, 1), end_date=datetime.date
         # https://pimatic.org/api/actions/ --> queryDeviceAttributeEvents
         data = '{"criteria": { "deviceId": "smartmeter2", "after": ' + str(start) + ', "before": ' + str(eind) +'}}'
     
-        response = requests.get('http://192.168.2.17:8080/api/database/device-attributes/', auth=(secrets['username'], secrets['password']), headers=headers, data=data)
+        response = requests.get('http://192.168.68.60:8080/api/database/device-attributes/', auth=(secrets['username'], secrets['password']), headers=headers, data=data)
         jsonresponse = response.json()
     
         for data in jsonresponse['events']:
